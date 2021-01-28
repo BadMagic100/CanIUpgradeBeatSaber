@@ -66,8 +66,8 @@ worked correctly.
 
 #### Download the script
 
-Download and extract the .zip file from the Releases page and put it in a location of your
-choosing.
+Download the .zip file from the [latest release](https://github.com/The-Demp/CanIUpgradeBeatSaber/releases/latest)
+and extract it in a location of your choosing.
 
 #### Create a virtual environment (Optional)
 
