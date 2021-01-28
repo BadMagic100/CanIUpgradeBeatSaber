@@ -112,7 +112,7 @@ On your first usage of the script, you'll need to provide your Beat Saber instal
 this:  
 `> python upgrade_check.py --install-path "D:\Program Files\Steam\steamapps\common\Beat Saber"`
 
-Your path may be different, and you can find it Mod Assistant if you're stuck. Note the
+Your path may be different, and you can find it in Mod Assistant if you're stuck. Note the
 quotes around the path, since it contains spaces.
 
 After the initial run, you no longer need to provide this flag, and can just run  
