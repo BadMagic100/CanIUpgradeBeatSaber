@@ -106,7 +106,8 @@ Open a command line to the location of the script. See [above](#commandLine) for
 on how to do this. If you're using a virtual environment, activate it. First, you'll need
 to install additional dependencies. Run `> pip install -r requirements.txt`. Then run the
 following command, which will provide more information about the program:  
-`> python upgrade_check.py --help`
+`> python upgrade_check.py --help`. This includes details on how to use each argument and
+whether they are required.
 
 On your first usage of the script, you'll need to provide your Beat Saber installation, like
 this:  

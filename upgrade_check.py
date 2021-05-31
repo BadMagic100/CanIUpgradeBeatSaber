@@ -1,8 +1,9 @@
 import argparse
+import itertools
 import re
 import textwrap
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union, Callable, Any, Iterable
 
 from pypref import SinglePreferences as Preferences
 from texttable import Texttable
@@ -70,8 +71,8 @@ def optional_text(text: Optional[str]) -> str:
     return text if text else "-"
 
 
-TABLE_HEADERS = ["Name", "Available on BeatMods", "Upgrade Available", "Source Version", "Target Version", "Link"]
 TABLE_FORMAT = Texttable.HEADER | Texttable.VLINES | Texttable.HLINES
+TABLE_HEADERS = ["Name", "From BeatMods", "Upgradeable", "Old Version", "New Version", "Link"]
 TABLE_ALIGN = ["c", "l", "l", "l", "l", "l"]
 TABLE_DTYPE = ['t', boolean_text, boolean_text, optional_text, optional_text, optional_text]
 
@@ -86,12 +87,14 @@ def mod_name_sort_order(mod: Mod) -> str:
     return mod.name
 
 
-def make_mod_diff_to_rows(mod_diff: List[Tuple[Mod, Optional[Mod]]]):
+def make_mod_diff_to_rows(mod_diff: List[Tuple[Mod, Optional[Mod]]], include_upgradeable: bool = True):
     """
     Converts a list of mod diffs to table rows
     """
     return [[old.name, old.version, safe_version(new), old.version, safe_version(new), old.link]
-            for old, new in sorted(mod_diff, key=lambda x: mod_name_sort_order(x[0]))]
+            for old, new in sorted(mod_diff, key=lambda x: mod_name_sort_order(x[0]))
+            # if we want to include upgradeable mods, get everything. otherwise only get it if there's no new version
+            if include_upgradeable or safe_version(new) is None]
 
 
 def make_mod_list_to_rows(mods: List[Mod]):
@@ -99,6 +102,32 @@ def make_mod_list_to_rows(mods: List[Mod]):
     Converts a list of mods to table rows, assuming they are not available on BeatMods
     """
     return [[mod.name, None, None, None, None, None] for mod in sorted(mods, key=mod_name_sort_order)]
+
+
+def make_slicing_function(*slicers: slice) -> Callable[[List[Any]], List[Any]]:
+    """
+    Makes a slicing function that composes a new list out of various slices of the original list
+    :param slicers: The slicers to use
+    :return: A callable that can slice the new list
+    """
+    def closure(items: List[Any]) -> List[Any]:
+        return list(itertools.chain.from_iterable(items[s] for s in slicers))
+    return closure
+
+
+def slice_columns(slicer_fn: Callable[[List[Any]], List[Any]],
+                  rows: List[Any]) -> Iterable:
+    """
+    Gets a customizable slice of columns from a list of rows or column properties
+    :param rows: The rows of the table, or a list of column properties. All rows should be of the same length.
+    :param slicer_fn: A slicing function to use.
+    :return: An iterable of the rows after slicing the columns.
+    """
+    # transpose to columns, then slice the collection of columns
+    column_properties = list(zip(*rows))
+    sliced_column_properties = slicer_fn(column_properties)
+    # transpose back
+    return zip(*sliced_column_properties)
 
 
 def parse_args_and_preferences() -> argparse.Namespace:
@@ -139,6 +168,13 @@ def parse_args_and_preferences() -> argparse.Namespace:
                              "in the previous run. Required for the first run. You can find this in Mod Assistant's "
                              "settings if you're not sure. If there's a space in the path, wrap the path in "
                              "quotes (\")")
+    parser.add_argument("--no-upgrade-only", "-n", action="store_true", required=False,
+                        help="Optional flag. Hides mods that have an upgrade available from Mod Assistant. This can "
+                             "reduce clutter if you don't need or want a list of all your installed mods.")
+    parser.add_argument("--show-versions", "-v", action="store_true", required=False,
+                        help="Optional flag. Display installed and target version of each mod. Generally this is not "
+                             "relevant and takes more space in the table, but it's a fun detail that's available "
+                             "if you want it!")
 
     args = parser.parse_args()
 
@@ -183,15 +219,22 @@ def main(args: argparse.Namespace):
     # find which of our installed mods have an available upgrade
     upgrade_diff = im.upgrade_diff(installed_mods_on_beatmods, target_ver_mods)
 
+    # make the appropriate slicer function based on whether versions should be shown
+    if args.show_versions:
+        slicer_fn = make_slicing_function(slice(None))
+    else:
+        slicer_fn = make_slicing_function(slice(3), slice(-1, None))
+
     # format everything into a nice table and print it. List online mods first.
+    headers, aligns, dtypes = slice_columns(slicer_fn, [TABLE_HEADERS, TABLE_ALIGN, TABLE_DTYPE])
     table = Texttable()
-    table.header(TABLE_HEADERS)
-    table.set_cols_align(TABLE_ALIGN)
-    table.set_cols_dtype(TABLE_DTYPE)
+    table.header(headers)
+    table.set_cols_align(aligns)
+    table.set_cols_dtype(dtypes)
     table.set_deco(TABLE_FORMAT)
     table.set_max_width(120)
-    table.add_rows(make_mod_diff_to_rows(upgrade_diff), False)
-    table.add_rows(make_mod_list_to_rows(installed_mods_other), False)
+    table.add_rows(slice_columns(slicer_fn, make_mod_diff_to_rows(upgrade_diff, not args.no_upgrade_only)), False)
+    table.add_rows(slice_columns(slicer_fn, make_mod_list_to_rows(installed_mods_other)), False)
     print(table.draw())
 
 
