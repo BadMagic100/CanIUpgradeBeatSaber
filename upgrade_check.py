@@ -15,6 +15,8 @@ from util.constants import *
 from model.beat_mods_version import BeatModsVersion
 from model.mod import Mod
 
+from gui.table_ui import TableUI
+
 
 def validate_beat_saber_version(value: str) -> BeatModsVersion:
     """
@@ -74,7 +76,7 @@ def optional_text(text: Optional[str]) -> str:
 TABLE_FORMAT = Texttable.HEADER | Texttable.VLINES | Texttable.HLINES
 TABLE_HEADERS = ["Name", "From BeatMods", "Upgradeable", "Old Version", "New Version", "Link"]
 TABLE_ALIGN = ["c", "l", "l", "l", "l", "l"]
-TABLE_DTYPE = ['t', boolean_text, boolean_text, optional_text, optional_text, optional_text]
+TABLE_DTYPE = [str, boolean_text, boolean_text, optional_text, optional_text, optional_text]
 
 
 def safe_version(mod: Optional[Mod]) -> str:
@@ -127,7 +129,7 @@ def slice_columns(slicer_fn: Callable[[List[Any]], List[Any]],
     column_properties = list(zip(*rows))
     sliced_column_properties = slicer_fn(column_properties)
     # transpose back
-    return zip(*sliced_column_properties)
+    return list(zip(*sliced_column_properties))
 
 
 def parse_args_and_preferences() -> argparse.Namespace:
@@ -184,6 +186,19 @@ def parse_args_and_preferences() -> argparse.Namespace:
     return args
 
 
+def render_console(headers: List[str], aligns: List[str], dtypes: List[Union[str, Callable[[Any], str]]],
+                   *row_subsets):
+    table = Texttable()
+    table.header(headers)
+    table.set_cols_align(aligns)
+    table.set_cols_dtype(dtypes)
+    table.set_deco(TABLE_FORMAT)
+    table.set_max_width(120)
+    for row_subset in row_subsets:
+        table.add_rows(row_subset, False)
+    print(table.draw())
+
+
 def main(args: argparse.Namespace):
     # get the installed and target BeatMods version
     current_version = bs.get_installed_version(args.install_path)
@@ -227,15 +242,15 @@ def main(args: argparse.Namespace):
 
     # format everything into a nice table and print it. List online mods first.
     headers, aligns, dtypes = slice_columns(slicer_fn, [TABLE_HEADERS, TABLE_ALIGN, TABLE_DTYPE])
-    table = Texttable()
-    table.header(headers)
-    table.set_cols_align(aligns)
-    table.set_cols_dtype(dtypes)
-    table.set_deco(TABLE_FORMAT)
-    table.set_max_width(120)
-    table.add_rows(slice_columns(slicer_fn, make_mod_diff_to_rows(upgrade_diff, not args.no_upgrade_only)), False)
-    table.add_rows(slice_columns(slicer_fn, make_mod_list_to_rows(installed_mods_other)), False)
-    print(table.draw())
+    mod_installer_rows = slice_columns(slicer_fn, make_mod_diff_to_rows(upgrade_diff, not args.no_upgrade_only))
+    manual_mod_rows = slice_columns(slicer_fn, make_mod_list_to_rows(installed_mods_other))
+
+    render_console(headers, aligns, dtypes, mod_installer_rows, manual_mod_rows)
+
+    ui = TableUI(current_version, target_version, headers, aligns, dtypes)
+    ui.add_items(mod_installer_rows)
+    ui.add_items(manual_mod_rows)
+    ui.show()
 
 
 if __name__ == "__main__":
