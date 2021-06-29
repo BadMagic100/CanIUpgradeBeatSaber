@@ -3,7 +3,7 @@ import itertools
 import re
 import textwrap
 from pathlib import Path
-from typing import List, Optional, Tuple, Union, Callable, Any, Iterable
+from typing import List, Optional, Tuple, Union, Callable, Any, Iterable, Set
 
 from pypref import SinglePreferences as Preferences
 from texttable import Texttable
@@ -11,11 +11,12 @@ from texttable import Texttable
 import util.beat_saber as bs
 import util.available_mods as am
 import util.installed_mods as im
+from ui.console_table_ui import ConsoleTableUI
 from util.constants import *
 from model.beat_mods_version import BeatModsVersion
 from model.mod import Mod
 
-from gui.table_ui import TableUI
+from ui.graphical_table_ui import GraphicalTableUI
 
 
 def validate_beat_saber_version(value: str) -> BeatModsVersion:
@@ -73,7 +74,6 @@ def optional_text(text: Optional[str]) -> str:
     return text if text else "-"
 
 
-TABLE_FORMAT = Texttable.HEADER | Texttable.VLINES | Texttable.HLINES
 TABLE_HEADERS = ["Name", "From BeatMods", "Upgradeable", "Old Version", "New Version", "Link"]
 TABLE_ALIGN = ["c", "l", "l", "l", "l", "l"]
 TABLE_DTYPE = [str, boolean_text, boolean_text, optional_text, optional_text, optional_text]
@@ -83,10 +83,11 @@ def safe_version(mod: Optional[Mod]) -> str:
     return mod.version if mod else None
 
 
-def mod_name_sort_order(mod: Mod) -> str:
-    if mod.name == "BSIPA":
+def mod_name_sort_order(mod: Union[Mod, str]) -> str:
+    name = mod if isinstance(mod, str) else mod.name
+    if name == "BSIPA":
         return ""
-    return mod.name
+    return name
 
 
 def make_mod_diff_to_rows(mod_diff: List[Tuple[Mod, Optional[Mod]]], include_upgradeable: bool = True):
@@ -101,9 +102,11 @@ def make_mod_diff_to_rows(mod_diff: List[Tuple[Mod, Optional[Mod]]], include_upg
 
 def make_mod_list_to_rows(mods: List[Mod]):
     """
-    Converts a list of mods to table rows, assuming they are not available on BeatMods
+    Converts a list of mods to table rows, assuming they are not available on BeatMods. Since installed mods can yield
+    a single mod object per file, this also filters down to uniquely named mods
     """
-    return [[mod.name, None, None, None, None, None] for mod in sorted(mods, key=mod_name_sort_order)]
+    unique_names = set(map(lambda x: x.name, mods))
+    return [[mod_name, None, None, None, None, None] for mod_name in sorted(unique_names, key=mod_name_sort_order)]
 
 
 def make_slicing_function(*slicers: slice) -> Callable[[List[Any]], List[Any]]:
@@ -186,29 +189,30 @@ def parse_args_and_preferences() -> argparse.Namespace:
     return args
 
 
-def render_console(headers: List[str], aligns: List[str], dtypes: List[Union[str, Callable[[Any], str]]],
-                   *row_subsets):
-    table = Texttable()
-    table.header(headers)
-    table.set_cols_align(aligns)
-    table.set_cols_dtype(dtypes)
-    table.set_deco(TABLE_FORMAT)
-    table.set_max_width(120)
-    for row_subset in row_subsets:
-        table.add_rows(row_subset, False)
-    print(table.draw())
-
-
 def main(args: argparse.Namespace):
+    # make the appropriate slicer function based on whether versions should be shown
+    if args.show_versions:
+        slicer_fn = make_slicing_function(slice(None))
+    else:
+        slicer_fn = make_slicing_function(slice(3), slice(-1, None))
+
+    # slice headers and column metadata
+    headers, aligns, dtypes = slice_columns(slicer_fn, [TABLE_HEADERS, TABLE_ALIGN, TABLE_DTYPE])
+
     # get the installed and target BeatMods version
-    current_version = bs.get_installed_version(args.install_path)
+    current_version = BeatModsVersion("1.13.4", "1.15.0")  # bs.get_installed_version(args.install_path)
     target_version = args.target if args.target else bs.get_latest_beat_saber_version()
 
+    each_ui = list(map(lambda x: x(current_version, target_version, headers, aligns, dtypes),
+                    [ConsoleTableUI, GraphicalTableUI]))
+
     if target_version <= current_version:
-        print(f"Target version ({target_version.alias}) must be newer than current version ({current_version.alias}).")
+        msg = f"Target version ({target_version.alias}) must be newer than current version ({current_version.alias})."
+        for ui in each_ui:
+            ui.alert(msg)
         exit(1)
 
-    print(f"Evaluating upgrade from {current_version.alias} to {target_version.alias}...")
+    each_ui[0].alert(f"Evaluating upgrade from {current_version.alias} to {target_version.alias}...")
 
     # get available mods for current and target version
     current_ver_mods = am.get_mods_for_version(current_version)
@@ -217,15 +221,12 @@ def main(args: argparse.Namespace):
     # verify there's a BSIPA install. if not, we're not on a modded install of Beat Saber
     bsipa = im.get_bsipa(args.install_path)
     # this will get a list of 0 or 1 BSIPA mods
-    bsipa = im.intersect_against_available([bsipa], current_ver_mods)[0]
+    bsipa = im.intersect_against_available({bsipa}, current_ver_mods)[0]
 
     if not bsipa:
-        print("BSIPA is not installed.")
+        for ui in each_ui:
+            ui.alert("BSIPA is not installed.")
         exit(1)
-
-    # there's an installed BSIPA, take it out of the list for use
-    bsipa = bsipa[0]
-    print(f"Found installed BSIPA version: {str(bsipa)}")
 
     # find mods we have installed and detect which ones are on BeatMods for our current version
     installed_mods = im.get_installed_mods(args.install_path)
@@ -234,23 +235,13 @@ def main(args: argparse.Namespace):
     # find which of our installed mods have an available upgrade
     upgrade_diff = im.upgrade_diff(installed_mods_on_beatmods, target_ver_mods)
 
-    # make the appropriate slicer function based on whether versions should be shown
-    if args.show_versions:
-        slicer_fn = make_slicing_function(slice(None))
-    else:
-        slicer_fn = make_slicing_function(slice(3), slice(-1, None))
-
-    # format everything into a nice table and print it. List online mods first.
-    headers, aligns, dtypes = slice_columns(slicer_fn, [TABLE_HEADERS, TABLE_ALIGN, TABLE_DTYPE])
     mod_installer_rows = slice_columns(slicer_fn, make_mod_diff_to_rows(upgrade_diff, not args.no_upgrade_only))
     manual_mod_rows = slice_columns(slicer_fn, make_mod_list_to_rows(installed_mods_other))
 
-    render_console(headers, aligns, dtypes, mod_installer_rows, manual_mod_rows)
-
-    ui = TableUI(current_version, target_version, headers, aligns, dtypes)
-    ui.add_items(mod_installer_rows)
-    ui.add_items(manual_mod_rows)
-    ui.show()
+    for ui in each_ui:
+        ui.add_items(mod_installer_rows)
+        ui.add_items(manual_mod_rows)
+        ui.show()
 
 
 if __name__ == "__main__":
