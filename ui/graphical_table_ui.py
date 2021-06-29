@@ -1,12 +1,14 @@
 import tkinter as tk
+from tkinter import messagebox as mb
 import webbrowser
 from tkinter import ttk
 from typing import List, Callable, Any, Iterable
 
 from model.beat_mods_version import BeatModsVersion
+from ui.base_table_ui import BaseTableUI
 
 
-class TableUI:
+class GraphicalTableUI(BaseTableUI):
 
     __ALIGNMENT_LOOKUP = {
         'c': tk.CENTER,
@@ -50,7 +52,7 @@ class TableUI:
 
         for i, (h, a) in enumerate(zip(header, align), start=1):
             # link col is always last, allocate most space for that one
-            table.column(str(i), anchor=TableUI.__ALIGNMENT_LOOKUP[a], stretch=(i == len(header)))
+            table.column(str(i), anchor=GraphicalTableUI.__ALIGNMENT_LOOKUP[a], stretch=(i == len(header)))
             table.heading(str(i), text=h)
 
         table.bind("<Button-1>", self.__treeview_click)
@@ -59,10 +61,16 @@ class TableUI:
         table.tag_configure("odd", background="red")
         table.pack(expand=True, fill=tk.BOTH)
 
+        gui.withdraw()
+
     def add_items(self, items: Iterable[Iterable]):
         for item in items:
             mapped_row = list(map(lambda x: x[0](x[1]), zip(self._dtypes, item)))
             self._table.insert("", tk.END, values=mapped_row)
 
     def show(self):
+        self._gui.deiconify()
         self._gui.mainloop()
+
+    def alert(self, message: str):
+        mb.showerror(message=message)
