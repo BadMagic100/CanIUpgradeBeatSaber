@@ -69,7 +69,7 @@ worked correctly.
 Download the .zip file from the [latest release](https://github.com/The-Demp/CanIUpgradeBeatSaber/releases/latest)
 and extract it in a location of your choosing.
 
-#### Create a virtual environment (Optional)
+#### Create a virtual environment (Optional, but strongly recommended)
 
 Python has the concept of a "virtual environment" which is a small and isolated Python
 interpreter that allows cleaner dependency management. If you don't create a virtual
