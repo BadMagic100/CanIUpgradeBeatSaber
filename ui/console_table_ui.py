@@ -11,6 +11,8 @@ class ConsoleTableUI(BaseTableUI):
 
     def __init__(self, old_version: BeatModsVersion, new_version: BeatModsVersion,
                  header: List[str], align: List[str], dtype: List[Callable[[Any], str]]):
+        print(f"Evaluating upgrade from {old_version.alias} to {new_version.alias}...")
+
         self._table = table = Texttable()
         table.header(header)
         table.set_cols_align(align)

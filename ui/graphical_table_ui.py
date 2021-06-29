@@ -39,28 +39,41 @@ class GraphicalTableUI(BaseTableUI):
                  width: int = 1000, height: int = 600):
         self._dtypes = dtype
 
+        # configure root window
         self._gui = gui = tk.Tk()
         gui.title(f"Beat Saber Mod Upgrade - {old_version.alias} to {new_version.alias}")
         gui.geometry(f"{width}x{height}")
 
+        # set up the data table
         self._table = table = ttk.Treeview(gui, selectmode="browse", show="headings",
                                            columns=tuple(range(1, len(header) + 1)))
 
-        scroll = ttk.Scrollbar(gui, orient=tk.VERTICAL, command=table.yview)
-        scroll.pack(side=tk.RIGHT, fill=tk.BOTH)
-        table.configure(yscrollcommand=scroll.set)
-
         for i, (h, a) in enumerate(zip(header, align), start=1):
-            # link col is always last, allocate most space for that one
-            table.column(str(i), anchor=GraphicalTableUI.__ALIGNMENT_LOOKUP[a], stretch=(i == len(header)))
+            # first column is always the name, make it wider than others
+            col_width = 200 if i == 1 else 120
+            # allow the last column (link) to stretch out to the screen bounds
+            should_stretch = i == len(header)
+            table.column(str(i), anchor=GraphicalTableUI.__ALIGNMENT_LOOKUP[a], stretch=should_stretch,
+                         width=col_width, minwidth=col_width)
             table.heading(str(i), text=h)
 
         table.bind("<Button-1>", self.__treeview_click)
         table.bind("<Motion>", self.__treeview_motion)
         table.bind("<Double-1>", self.__treeview_link)
-        table.tag_configure("odd", background="red")
-        table.pack(expand=True, fill=tk.BOTH)
 
+        # add scrollbars for the treeview
+        yscroll = ttk.Scrollbar(gui, orient=tk.VERTICAL, command=table.yview)
+        xscroll = ttk.Scrollbar(gui, orient=tk.HORIZONTAL, command=table.xview)
+        table.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+
+        # do layout
+        yscroll.grid(row=0, column=1, sticky=tk.NS)
+        xscroll.grid(row=1, column=0, sticky=tk.EW)
+        table.grid(row=0, column=0, sticky=tk.NSEW)
+        gui.rowconfigure(0, weight=1)
+        gui.columnconfigure(0, weight=1)
+
+        # start minimized so we're allowed to show messageboxes first
         gui.withdraw()
 
     def add_items(self, items: Iterable[Iterable]):

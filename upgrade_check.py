@@ -3,15 +3,15 @@ import itertools
 import re
 import textwrap
 from pathlib import Path
-from typing import List, Optional, Tuple, Union, Callable, Any, Iterable, Set
+from typing import List, Optional, Tuple, Union, Callable, Any, Iterable
 
 from pypref import SinglePreferences as Preferences
-from texttable import Texttable
 
 import util.beat_saber as bs
 import util.available_mods as am
 import util.installed_mods as im
 from ui.console_table_ui import ConsoleTableUI
+from ui.ui_style import UIStyle
 from util.constants import *
 from model.beat_mods_version import BeatModsVersion
 from model.mod import Mod
@@ -173,6 +173,10 @@ def parse_args_and_preferences() -> argparse.Namespace:
                              "in the previous run. Required for the first run. You can find this in Mod Assistant's "
                              "settings if you're not sure. If there's a space in the path, wrap the path in "
                              "quotes (\")")
+    parser.add_argument("--style", "-s", type=UIStyle, choices=list(UIStyle), required=False, default=UIStyle.CONSOLE,
+                        help="The UI style to use. Defaults to console - if you're running the script in a place you "
+                             "can see this, that's probably what you wanted anyway. For Windows users, a batch script "
+                             "is provided to more easily run the graphical UI with sensible defaults.")
     parser.add_argument("--no-upgrade-only", "-n", action="store_true", required=False,
                         help="Optional flag. Hides mods that have an upgrade available from Mod Assistant. This can "
                              "reduce clutter if you don't need or want a list of all your installed mods.")
@@ -203,16 +207,13 @@ def main(args: argparse.Namespace):
     current_version = bs.get_installed_version(args.install_path)
     target_version = args.target if args.target else bs.get_latest_beat_saber_version()
 
-    each_ui = list(map(lambda x: x(current_version, target_version, headers, aligns, dtypes),
-                    [ConsoleTableUI, GraphicalTableUI]))
+    ui_class = GraphicalTableUI if args.style == UIStyle.GRAPHICAL else ConsoleTableUI
+    ui = ui_class(current_version, target_version, headers, aligns, dtypes)
 
     if target_version <= current_version:
         msg = f"Target version ({target_version.alias}) must be newer than current version ({current_version.alias})."
-        for ui in each_ui:
-            ui.alert(msg)
+        ui.alert(msg)
         exit(1)
-
-    each_ui[0].alert(f"Evaluating upgrade from {current_version.alias} to {target_version.alias}...")
 
     # get available mods for current and target version
     current_ver_mods = am.get_mods_for_version(current_version)
@@ -221,11 +222,10 @@ def main(args: argparse.Namespace):
     # verify there's a BSIPA install. if not, we're not on a modded install of Beat Saber
     bsipa = im.get_bsipa(args.install_path)
     # this will get a list of 0 or 1 BSIPA mods
-    bsipa = im.intersect_against_available({bsipa}, current_ver_mods)[0]
+    bsipa = im.intersect_against_available([bsipa], current_ver_mods)[0]
 
     if not bsipa:
-        for ui in each_ui:
-            ui.alert("BSIPA is not installed.")
+        ui.alert("BSIPA is not installed.")
         exit(1)
 
     # find mods we have installed and detect which ones are on BeatMods for our current version
@@ -238,10 +238,9 @@ def main(args: argparse.Namespace):
     mod_installer_rows = slice_columns(slicer_fn, make_mod_diff_to_rows(upgrade_diff, not args.no_upgrade_only))
     manual_mod_rows = slice_columns(slicer_fn, make_mod_list_to_rows(installed_mods_other))
 
-    for ui in each_ui:
-        ui.add_items(mod_installer_rows)
-        ui.add_items(manual_mod_rows)
-        ui.show()
+    ui.add_items(mod_installer_rows)
+    ui.add_items(manual_mod_rows)
+    ui.show()
 
 
 if __name__ == "__main__":
