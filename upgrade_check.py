@@ -200,7 +200,7 @@ def main(args: argparse.Namespace):
     headers, aligns, dtypes = slice_columns(slicer_fn, [TABLE_HEADERS, TABLE_ALIGN, TABLE_DTYPE])
 
     # get the installed and target BeatMods version
-    current_version = BeatModsVersion("1.13.4", "1.15.0")  # bs.get_installed_version(args.install_path)
+    current_version = bs.get_installed_version(args.install_path)
     target_version = args.target if args.target else bs.get_latest_beat_saber_version()
 
     each_ui = list(map(lambda x: x(current_version, target_version, headers, aligns, dtypes),
