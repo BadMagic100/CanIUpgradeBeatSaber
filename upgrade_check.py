@@ -211,8 +211,8 @@ def main(args: argparse.Namespace):
     ui = ui_class(current_version, target_version, headers, aligns, dtypes)
 
     if target_version <= current_version:
-        msg = f"Target version ({target_version.alias}) must be newer than current version ({current_version.alias})."
-        ui.alert(msg)
+        ui.alert(f"Target version ({target_version.alias}) must be newer than current version "
+                 f"({current_version.alias}).")
         exit(1)
 
     # get available mods for current and target version
