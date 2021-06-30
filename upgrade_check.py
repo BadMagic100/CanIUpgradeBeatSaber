@@ -10,6 +10,7 @@ from pypref import SinglePreferences as Preferences
 import util.beat_saber as bs
 import util.available_mods as am
 import util.installed_mods as im
+from ui.base_table_ui import BaseTableUI
 from ui.console_table_ui import ConsoleTableUI
 from ui.ui_style import UIStyle
 from util.constants import *
@@ -34,17 +35,18 @@ def validate_beat_saber_version(value: str) -> BeatModsVersion:
                                      "on BeatMods.")
 
 
-def validate_install_dir(value: str) -> Path:
+def validate_install_dir(value: str) -> Optional[Path]:
     """
     Validates and converts an install Path from a string input, or raises a validation error
     :param value: The raw command line argument
     :return:
     """
     path = Path(value)
-    if path.exists() and bs.get_installed_version(path):
-        return path
-    raise argparse.ArgumentTypeError(f"{value} is not a valid Beat Saber install directory, or your installed version "
-                                     "is not available on BeatMods.")
+    try:
+        if path.exists() and bs.get_installed_version(path):
+            return path
+    except OSError:
+        return None
 
 
 class NewlineSmartFormatter(argparse.HelpFormatter):
@@ -135,14 +137,11 @@ def slice_columns(slicer_fn: Callable[[List[Any]], List[Any]],
     return list(zip(*sliced_column_properties))
 
 
-def parse_args_and_preferences() -> argparse.Namespace:
+def parse_args() -> argparse.Namespace:
     """
-    Parses command line arguments and persistent preferences
+    Parses command line arguments
     :return: The parsed command line arguments
     """
-    # preprocessing
-    pref = Preferences(filename=PREFERENCES_FILE)
-    previously_provided_install_dir = pref.get(PREF_INSTALL_DIRECTORY, None)
 
     # parsing
     parser = argparse.ArgumentParser(description="This script can help you determine if it's safe to upgrade your PC"
@@ -167,12 +166,6 @@ def parse_args_and_preferences() -> argparse.Namespace:
     parser.add_argument("--target", "-t", type=validate_beat_saber_version,
                         help="The version to upgrade to. If not provided, defaults to the latest version of Beat "
                              "Saber available on BeatMods.")
-    parser.add_argument("--install-path", "-p", required=not previously_provided_install_dir, type=validate_install_dir,
-                        default=previously_provided_install_dir,
-                        help="The install directory of Beat Saber. If not provided, defaults to the directory used "
-                             "in the previous run. Required for the first run. You can find this in Mod Assistant's "
-                             "settings if you're not sure. If there's a space in the path, wrap the path in "
-                             "quotes (\")")
     parser.add_argument("--style", "-s", type=UIStyle, choices=list(UIStyle), required=False, default=UIStyle.CONSOLE,
                         help="The UI style to use. Defaults to console - if you're running the script in a place you "
                              "can see this, that's probably what you wanted anyway. For Windows users, a batch script "
@@ -187,13 +180,33 @@ def parse_args_and_preferences() -> argparse.Namespace:
 
     args = parser.parse_args()
 
-    # postprocessing
-    pref.update_preferences({PREF_INSTALL_DIRECTORY: str(args.install_path)})
-
     return args
 
 
+def get_install_path_and_update_preferences(ui: BaseTableUI) -> Path:
+    """
+    Gets the Beat Saber install path (from preferences if possible)
+    :param ui:
+    :return:
+    """
+    pref = Preferences(filename=PREFERENCES_FILE)
+    previously_provided_install_dir = pref.get(PREF_INSTALL_DIRECTORY, None)
+
+    if not previously_provided_install_dir:
+        install_path = validate_install_dir(ui.prompt_for_directory("Beat Saber Install Path"))
+    else:
+        install_path = validate_install_dir(previously_provided_install_dir)
+
+    if not install_path:
+        ui.alert("Provided Beat Saber installation path does not point to a valid Beat Saber installation.")
+        exit(1)
+
+    pref.update_preferences({PREF_INSTALL_DIRECTORY: str(install_path)})
+    return install_path
+
+
 def main(args: argparse.Namespace):
+
     # make the appropriate slicer function based on whether versions should be shown
     if args.show_versions:
         slicer_fn = make_slicing_function(slice(None))
@@ -203,12 +216,14 @@ def main(args: argparse.Namespace):
     # slice headers and column metadata
     headers, aligns, dtypes = slice_columns(slicer_fn, [TABLE_HEADERS, TABLE_ALIGN, TABLE_DTYPE])
 
-    # get the installed and target BeatMods version
-    current_version = bs.get_installed_version(args.install_path)
-    target_version = args.target if args.target else bs.get_latest_beat_saber_version()
-
     ui_class = GraphicalTableUI if args.style == UIStyle.GRAPHICAL else ConsoleTableUI
-    ui = ui_class(current_version, target_version, headers, aligns, dtypes)
+    ui = ui_class(headers, aligns, dtypes)
+
+    # get the installed and target BeatMods version
+    install_path = get_install_path_and_update_preferences(ui)
+    current_version = bs.get_installed_version(install_path)
+    target_version = args.target if args.target else bs.get_latest_beat_saber_version()
+    ui.set_versions(current_version, target_version)
 
     if target_version <= current_version:
         ui.alert(f"Target version ({target_version.alias}) must be newer than current version "
@@ -220,7 +235,7 @@ def main(args: argparse.Namespace):
     target_ver_mods = am.get_mods_for_version(target_version)
 
     # verify there's a BSIPA install. if not, we're not on a modded install of Beat Saber
-    bsipa = im.get_bsipa(args.install_path)
+    bsipa = im.get_bsipa(install_path)
     # this will get a list of 0 or 1 BSIPA mods
     bsipa = im.intersect_against_available([bsipa], current_ver_mods)[0]
 
@@ -229,7 +244,7 @@ def main(args: argparse.Namespace):
         exit(1)
 
     # find mods we have installed and detect which ones are on BeatMods for our current version
-    installed_mods = im.get_installed_mods(args.install_path)
+    installed_mods = im.get_installed_mods(install_path)
     installed_mods_on_beatmods, installed_mods_other = im.intersect_against_available(installed_mods, current_ver_mods)
 
     # find which of our installed mods have an available upgrade
@@ -244,4 +259,4 @@ def main(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-    main(parse_args_and_preferences())
+    main(parse_args())

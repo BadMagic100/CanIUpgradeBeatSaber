@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import messagebox as mb
+from tkinter import filedialog as fd
 import webbrowser
 from tkinter import ttk
-from typing import List, Callable, Any, Iterable
+from typing import List, Callable, Any, Iterable, Optional
 
 from model.beat_mods_version import BeatModsVersion
 from ui.base_table_ui import BaseTableUI
@@ -34,14 +35,12 @@ class GraphicalTableUI(BaseTableUI):
             if url != "-":
                 webbrowser.open(url)
 
-    def __init__(self, old_version: BeatModsVersion, new_version: BeatModsVersion,
-                 header: List[str], align: List[str], dtype: List[Callable[[Any], str]],
+    def __init__(self, header: List[str], align: List[str], dtype: List[Callable[[Any], str]],
                  width: int = 1000, height: int = 600):
         self._dtypes = dtype
 
         # configure root window
         self._gui = gui = tk.Tk()
-        gui.title(f"Beat Saber Mod Upgrade - {old_version.alias} to {new_version.alias}")
         gui.geometry(f"{width}x{height}")
 
         # set up the data table
@@ -76,6 +75,9 @@ class GraphicalTableUI(BaseTableUI):
         # start minimized so we're allowed to show messageboxes first
         gui.withdraw()
 
+    def set_versions(self, old_version: BeatModsVersion, new_version: BeatModsVersion):
+        self._gui.title(f"Beat Saber Mod Upgrade - {old_version.alias} to {new_version.alias}")
+
     def add_items(self, items: Iterable[Iterable]):
         for item in items:
             mapped_row = list(map(lambda x: x[0](x[1]), zip(self._dtypes, item)))
@@ -87,3 +89,6 @@ class GraphicalTableUI(BaseTableUI):
 
     def alert(self, message: str):
         mb.showerror(message=message)
+
+    def prompt_for_directory(self, message: Optional[str] = None) -> Optional[str]:
+        return fd.askdirectory(title=message, mustexist=True)
