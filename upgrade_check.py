@@ -220,13 +220,14 @@ def main(args: argparse.Namespace):
     ui = ui_class(headers, aligns, dtypes)
 
     # get the installed and target BeatMods version
+    # TODO: Test this all on a real, breaking version upgrade and launch a new release
     install_path = get_install_path_and_update_preferences(ui)
     current_version = bs.get_installed_version(install_path)
     target_version = args.target if args.target else bs.get_latest_beat_saber_version()
     ui.set_versions(current_version, target_version)
 
-    if target_version <= current_version:
-        ui.alert(f"Target version ({target_version.alias}) must be newer than current version "
+    if target_version < current_version:
+        ui.alert(f"Target version ({target_version.alias}) must be at least the current version "
                  f"({current_version.alias}).")
         exit(1)
 

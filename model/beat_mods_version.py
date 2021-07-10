@@ -43,7 +43,8 @@ class BeatModsVersion:
         if not isinstance(other, BeatModsVersion):
             return False
 
-        if (self is None and other is not None) or (self is not None and other is None):
+        # self can never be None...
+        if other is None:
             return False
 
         return self.version == other.version and self.alias == other.alias
