@@ -10,30 +10,41 @@ from ui.base_table_ui import BaseTableUI
 
 
 class GraphicalTableUI(BaseTableUI):
-
     __ALIGNMENT_LOOKUP = {
         'c': tk.CENTER,
         'l': tk.W,
         'r': tk.E
     }
 
+    def __is_mouse_in_last_column(self, mouse_x):
+        *_, last = iter(self._table['columns'])
+        col = self._table.identify_column(mouse_x)
+        return col == f'#{last}'
+
+    def __get_mouse_row_link_text(self, mouse_y):
+        row_id = self._table.identify_row(mouse_y)
+        row_values = self._table.item(row_id, "values")
+        return row_values[-1]
+
     def __treeview_click(self, event):
+        region = self._table.identify_region(event.x, event.y)
+        if region == "cell" and self.__is_mouse_in_last_column(event.x):
+            link_text = self.__get_mouse_row_link_text(event.y)
+            if link_text != "-":
+                webbrowser.open(link_text)
         if self._table.identify_region(event.x, event.y) == "separator":
             return "break"
 
     def __treeview_motion(self, event):
-        if self._table.identify_region(event.x, event.y) == "separator":
-            return "break"
+        region = self._table.identify_region(event.x, event.y)
+        if (region == "cell" and self.__is_mouse_in_last_column(event.x)
+                and self.__get_mouse_row_link_text(event.y) != "-"):
+            self._gui.config(cursor="hand2")
+        else:
+            self._gui.config(cursor="arrow")
 
-    def __treeview_link(self, event):
-        *_, last = iter(self._table['columns'])
-        clicked_col = self._table.identify_column(event.x)
-        if clicked_col == "#" + last:
-            selected_id = self._table.selection()
-            selected_item = self._table.item(selected_id, "values")
-            url = selected_item[-1]
-            if url != "-":
-                webbrowser.open(url)
+        if region == "separator":
+            return "break"
 
     def __init__(self, header: List[str], align: List[str], dtype: List[Callable[[Any], str]],
                  width: int = 1000, height: int = 600):
@@ -44,7 +55,7 @@ class GraphicalTableUI(BaseTableUI):
         gui.geometry(f"{width}x{height}")
 
         # set up the data table
-        self._table = table = ttk.Treeview(gui, selectmode="browse", show="headings",
+        self._table = table = ttk.Treeview(gui, selectmode="none", show="headings",
                                            columns=tuple(range(1, len(header) + 1)))
 
         for i, (h, a) in enumerate(zip(header, align), start=1):
@@ -58,7 +69,6 @@ class GraphicalTableUI(BaseTableUI):
 
         table.bind("<Button-1>", self.__treeview_click)
         table.bind("<Motion>", self.__treeview_motion)
-        table.bind("<Double-1>", self.__treeview_link)
 
         # add scrollbars for the treeview
         yscroll = ttk.Scrollbar(gui, orient=tk.VERTICAL, command=table.yview)
