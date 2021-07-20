@@ -220,7 +220,6 @@ def main(args: argparse.Namespace):
     ui = ui_class(headers, aligns, dtypes)
 
     # get the installed and target BeatMods version
-    # TODO: Test this all on a real, breaking version upgrade and launch a new release
     install_path = get_install_path_and_update_preferences(ui)
     current_version = bs.get_installed_version(install_path)
     target_version = args.target if args.target else bs.get_latest_beat_saber_version()

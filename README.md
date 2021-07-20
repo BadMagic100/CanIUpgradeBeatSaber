@@ -1,4 +1,4 @@
-## Table of contents
+# Table of contents
 1. [What is it?](#what-is-it)
 2. [What can it do?](#what-can-it-do)
 3. [What can it NOT do?](#what-can-it-not-do)
@@ -10,12 +10,12 @@
        3. [Create a virtual environment](#create-a-virtual-environment-optional)
    2. [Usage](#usage)
 
-## What is it?
+# What is it?
 
 A utility script to help players determine whether they can safely upgrade their modded
 install of PC Beat Saber.
 
-## What can it do?
+# What can it do?
 
 This script can help you determine if it's safe to upgrade your PC installation of Beat
 Saber by telling you which of your installed mods have a known upgrade available in your
@@ -27,13 +27,13 @@ upgrade," you will have the information to ask questions like the following:
   have to find upgrades for?"
 * "Do I really care that (some mod) is missing in the new version, or can I live without it?"
 
-## What can it NOT do?
+# What can it NOT do?
 
 This tool doesn't know everything. It cannot tell you anything about mods that are not
 available on Mod Assistant, nor can it tell you if a mod's functionality has been replaced
 by a new mod or the base game.
 
-## This says a mod isn't available, what can I do?
+# This says a mod isn't available, what can I do?
 
 If a mod you want to keep doesn't have an upgrade available, here are some things you can
 try to help you decide if you should upgrade:
@@ -45,14 +45,14 @@ try to help you decide if you should upgrade:
   have beta version available. At a minimum, you can usually tell if a mod is actively
   being developed by it
   
-## That sounds great, how do I use it?
+# That sounds great, how do I use it?
 
-### Installation and setup
+## Installation and setup
 
 This section assumes that you've never used a Python program or GitHub before. If that's
 not the case, you can probably skip to [Usage](#usage).
 
-#### Install Python
+### Install Python
 
 You'll need to install a Python interpreter in order to run this script. It's developed and
 tested in [Python 3.9.1](https://www.python.org/downloads/release/python-391/), which is the
@@ -64,10 +64,22 @@ environment variables" or "Add Python to PATH" on the first page of the installe
 finished installing, open a command prompt and enter `python --version` to make sure it
 worked correctly.
 
-#### Download the script
+### Download the script
 
 Download the .zip file from the [latest release](https://github.com/The-Demp/CanIUpgradeBeatSaber/releases/latest)
 and extract it in a location of your choosing.
+
+### Automated dependency installation
+
+Use the provided script `install.bat` to set up a virtual environment and install the 
+needed dependencies. Since the file is downloaded from the internet, you may need allow it
+past Windows Defender. If you're not comfortable doing this, you can also perform the setup
+steps manually as detailed below.
+
+### Manual dependency installation
+
+This section details all of the steps performed by the `install.bat` script if you'd rather
+perform them manually.
 
 #### Create a virtual environment (Optional, but strongly recommended)
 
@@ -82,8 +94,8 @@ To create a virtual environment, open a command prompt in the folder you unzippe
 (the place where `upgrade_check.py` is). If you click the whitespace in the file path you
 can copy and paste it in the command line, like this:  
 `> cd "C:\Users\YourUsername\Documents\CanIUpgradeBeatSaber"`  
-Some versions of Windows also have an "Open Command Window Here" if you right click in file
-explorer.
+Some versions of Windows also have an "Open Command Window Here" or "Open in Windows Terminal" 
+if you right click in file explorer.
 
 Run the following commands to create your virtual environment. It will create a folder called
 venv that contains your virtual environment.  
@@ -100,21 +112,21 @@ Open a command line to the location of the script. See [above](#commandLine) for
 on how to do this. If you're using a virtual environment, activate it.
 Run `> pip install -r requirements.txt` to install the required libraries.
 
-### Usage
+## Usage
+
+You can use the provided batch script `run_gui.bat` to run the UI with sensible defaults.
+Since the file is downloaded from the internet, you may need to allow it past Windows Defender.
+If you're not comfortable doing this
 
 Open a command line to the location of the script. See [above](#commandLine) for details
-on how to do this. If you're using a virtual environment, activate it. First, you'll need
-to install additional dependencies. Run `> pip install -r requirements.txt`. Then run the
+on how to do this. If you're using a virtual environment, activate it. Then run the
 following command, which will provide more information about the program:  
 `> python upgrade_check.py --help`. This includes details on how to use each argument and
 whether they are required.
 
-On your first usage of the script, you'll need to provide your Beat Saber installation, like
-this:  
-`> python upgrade_check.py --install-path "D:\Program Files\Steam\steamapps\common\Beat Saber"`
+On your first usage of the script, you'll be prompted for the location of yoru Beat Saber 
+installation. It should be the folder containing the file `Beat Saber.exe` (mine is 
+`D:\Program Files\Steam\steamapps\common\Beat Saber` for example).
 
-Your path may be different, and you can find it in Mod Assistant if you're stuck. Note the
-quotes around the path, since it contains spaces.
-
-After the initial run, you no longer need to provide this flag, and can just run  
-`> python upgrade_check.py`.
+Your path may be different, and you can find it in Mod Assistant if you're stuck. After the
+initial run, the program will remember this for you.
